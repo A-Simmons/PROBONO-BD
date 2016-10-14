@@ -81,27 +81,27 @@ plotStore(7)
 This is just a simple box plot analysis
 ```{r}
 # Function to retreve data from dataframe and composite into factor
-retrieveData <- function(data, deal, class, xy) {
+retrieveData <- function(data, deal, CLASS, xy) {
   names <- c("STORE", "PROFIT")
   if (xy == "x")
-    temp <- data %>% filter(deal_X==deal, class==class) %>% select(STORE, profit_X)
+    temp <- data %>% filter(deal_X==deal, class==CLASS) %>% select(STORE, profit_X)
    else
-    temp <- data %>% filter(deal_Y==deal, class==class) %>% select(STORE, profit_Y)
+    temp <- data %>% filter(deal_Y==deal, class==CLASS) %>% select(STORE, profit_Y)
   colnames(temp) <- names
   name <- if (xy == "x") "X" else "Y"
-  name <- if (class == "organic") paste(name,"O",sep="") else paste(name,"I",sep="") 
+  name <- if (CLASS == "organic") paste(name,"O",sep="") else paste(name,"I",sep="") 
   name <- if (deal == 1) paste(name,"deal",sep="_") else paste(name,"no_deal",sep="_") 
   return(data.frame(type=rep(name,nrow(temp)),temp))
 }
 
-boxplot_data <- retrieveData(data, deal=0, class="organic", xy="x")
-boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=0, class="nonorganic", xy="x"))
-boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=0, class="organic", xy="y"))
-boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=0, class="nonorganic", xy="y"))
-boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, class="organic", xy="x"))
-boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, class="nonorganic", xy="x"))
-boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, class="organic", xy="y"))
-boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, class="nonorganic", xy="y"))
+boxplot_data <- retrieveData(data, deal=0, CLASS="organic", xy="x")
+boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=0, CLASS="nonorganic", xy="x"))
+boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=0, CLASS="organic", xy="y"))
+boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=0, CLASS="nonorganic", xy="y"))
+boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, CLASS="organic", xy="x"))
+boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, CLASS="nonorganic", xy="x"))
+boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, CLASS="organic", xy="y"))
+boxplot_data <- rbind(boxplot_data,retrieveData(data, deal=1, CLASS="nonorganic", xy="y"))
 
 ggplot(boxplot_data, aes(x=type, y=PROFIT)) + geom_boxplot() + labs(title="Boxplots of profit for different products", x="Product", y = "Profit")
 ```
@@ -130,5 +130,129 @@ boxplot_data %>% filter(type=="YI_deal") %>% ggplot(., aes(x=STORE, y=PROFIT)) +
 
 
 ## Regression
+```{r}
+# Function that pulls out the data
+retrieveDataLM <- function(data, CLASS, xy) {
+  names <- c("STORE", "oz", "p", "deal")
+  if (xy == "x")
+    temp <- data %>% filter(.,class==CLASS) %>% select(.,STORE, oz_X, pX, deal_X)
+  else
+    temp <- data %>% filter(class==CLASS) %>% select(STORE, oz_Y, pY, deal_Y)
+  colnames(temp) <- names
+  name <- if (xy == "x") "X" else "Y"
+  name <- if (CLASS == "organic") paste(name,"O",sep="") else paste(name,"I",sep="") 
+  return(data.frame(type=rep(name,nrow(temp)),temp))
+}
+
+# Function that plots the loglog and actual curves
+filteredLM <- function(data, TYPE, log=FALSE, include_Deal=FALSE) {
+  response <- data %>% filter(type==TYPE) %>% select(oz) %>% {if (log) log(.) else (.)} %>% as.matrix()
+  elasticity <- data %>% filter(type==TYPE) %>% select(p) %>% {if (log) log(.) else (.)} %>% as.matrix()
+  deal <- data %>% filter(type==TYPE) %>% select(deal) %>% {if (include_Deal) (.) else (.)*0} %>% as.matrix()
+  return(lm(response~elasticity+deal))
+}
+
+# Function to plot Prediction with actual data
+plotStatsLogLog <- function(lm, type="loglog", title="") {
+  results <- data.frame(p=lm$model$elasticity, oz=lm$model$response, resid=resid(lm))
+  results <- mutate(results, loglogSol=lm$coefficients[1] + lm$coefficients[2]*p + if (is.na(lm$coefficients[3])) 0 else lm$coefficients[3]*lm$model$deal)
+  results$sol <- exp(results$loglogSol)
+  if (type == "loglog")
+    ggplot(results) + geom_point(aes(x=p, y=oz)) + geom_line(aes(x=p, y=loglogSol)) + labs(x="log(p)", y="log(oz)", title=title)
+  else
+    ggplot(results) + geom_point(aes(x=exp(p), y=exp(oz))) + geom_line(aes(x=exp(p), y=sol))  + labs(x="p", y="oz", title=title)
+}
+
+
+
+# Function that generates the inear model
+lm_data <- retrieveDataLM(data, CLASS="organic", xy="x")
+lm_data <- rbind(lm_data,retrieveDataLM(data, CLASS="nonorganic", xy="x"))
+lm_data <- rbind(lm_data,retrieveDataLM(data, CLASS="organic", xy="y"))
+lm_data <- rbind(lm_data,retrieveDataLM(data, CLASS="nonorganic", xy="y"))
+```
+
+### Log Regression for Organic X without deal dummy variable
+Linear regression for $\log(oz_{x-org}) = \log(k) + r \log(p_{x-org})$
+```{r}
+# Linear Model Summary for Organic X product without including the deal dummy variable
+XO_lm_without_deal <- filteredLM(lm_data, TYPE="XO", log=TRUE, include_Deal=FALSE)
+summary(XO_lm_without_deal)
+plotStatsLogLog(XO_lm_without_deal, "loglog", "loglog PED for Organic X without deal")
+plotStatsLogLog(XO_lm_without_deal, "normal", "PED for Organic X without deal")
+```
+
+### Log Regression for Organic X with deal dummy variable
+Linear regression for $\log(oz_{x-org}) = \log(k) + r \log(p_{x-org}) + deal_{x-org}$
+```{r}
+# Linear Model Summary for Organic X product including deal dummy variable
+XO_lm_with_deal <- filteredLM(lm_data, TYPE="XO", log=TRUE, include_Deal=TRUE)
+summary(XO_lm_with_deal)
+plotStatsLogLog(XO_lm_with_deal, "loglog", "loglog PED for Organic X with deal")
+plotStatsLogLog(XO_lm_with_deal, "normal", "PED for Organic X with deal")
+```
+
+### Log Regression for Organic Y without deal dummy variable
+Linear regression for $\log(oz_{y-org}) = \log(k) + r \log(p_{y-org})$
+```{r}
+# Linear Model Summary for Organic Y product without including the deal dummy variable
+YO_lm_without_deal <- filteredLM(lm_data, TYPE="YO", log=TRUE, include_Deal=FALSE)
+summary(YO_lm_without_deal)
+plotStatsLogLog(YO_lm_without_deal, "loglog", "loglog PED for Organic Y without deal")
+plotStatsLogLog(YO_lm_without_deal, "normal", "PED for Organic Y without deal")
+```
+
+### Log Regression for Organic Y with deal dummy variable
+Linear regression for $\log(oz_{y-org}) = \log(k) + r \log(p_{y-org}) + deal_{y-org}$
+```{r}
+# Linear Model Summary for Organic Y product including deal dummy variable
+YO_lm_with_deal <- filteredLM(lm_data, TYPE="YO", log=TRUE, include_Deal=TRUE)
+summary(YO_lm_with_deal)
+plotStatsLogLog(YO_lm_with_deal, "loglog", "loglog PED for Organic Y with deal")
+plotStatsLogLog(YO_lm_with_deal, "normal", "PED for Organic Y with deal")
+```
+
+### Log Regression for Nonorganic X without deal dummy variable
+Linear regression for $\log(oz_{x-nonorg}) = \log(k) + r \log(p_{x-nonorg})$
+```{r}
+# Linear Model Summary for Nonorganic X product without including the deal dummy variable
+XI_lm_without_deal <- filteredLM(lm_data, TYPE="XI", log=TRUE, include_Deal=FALSE)
+summary(XI_lm_without_deal)
+plotStatsLogLog(XI_lm_without_deal, "loglog", "loglog PED for Nonorganic X without deal")
+plotStatsLogLog(XI_lm_without_deal, "normal", "PED for Nonrganic X without deal")
+```
+
+### Log Regression for Nonorganic X with deal dummy variable
+Linear regression for $\log(oz_{x-nonorg}) = \log(k) + r \log(p_{x-nonorg}) + deal_{x-nonorg}$
+```{r}
+# Linear Model Summary for Nonorganic X product including deal dummy variable
+XI_lm_with_deal <- filteredLM(lm_data, TYPE="XI", log=TRUE, include_Deal=TRUE)
+summary(XI_lm_with_deal)
+plotStatsLogLog(XI_lm_with_deal, "loglog", "loglog PED for Nonorganic X with deal")
+plotStatsLogLog(XI_lm_with_deal, "normal", "PED for Nonorganic X with deal")
+```
+
+### Log Regression for Nonorganic Y without deal dummy variable
+Linear regression for $\log(oz_{y-nonorg}) = \log(k) + r \log(p_{y-nonorg})$
+```{r}
+# Linear Model Summary for Nonorganic Y product without including the deal dummy variable
+YI_lm_without_deal <- filteredLM(lm_data, TYPE="YI", log=TRUE, include_Deal=FALSE)
+summary(YI_lm_without_deal)
+plotStatsLogLog(YI_lm_without_deal, "loglog", "loglog PED for Nonorganic Y without deal")
+plotStatsLogLog(YI_lm_without_deal, "normal", "PED for Nonorganic Y without deal")
+```
+
+### Log Regression for Nonorganic Y with deal dummy variable
+Linear regression for $\log(oz_{y-nonorg}) = \log(k) + r \log(p_{y-nonorg}) + deal_{y-nonorg}$
+```{r}
+# Linear Model Summary for Nonorganic Y product including deal dummy variable
+YI_lm_with_deal <- filteredLM(lm_data, TYPE="YI", log=TRUE, include_Deal=TRUE)
+summary(YI_lm_with_deal)
+plotStatsLogLog(YI_lm_with_deal, "loglog", "loglog PED for Nonorganic Y with deal")
+plotStatsLogLog(YI_lm_with_deal, "normal", "PED for Nonorganic Y with deal")
+```
+
+
+
 
 

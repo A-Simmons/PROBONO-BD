@@ -11,11 +11,11 @@ generateLogLogPlots <- function(x,y) {
 
   qplot(x, y)
 
-  loglog = function(x){
+  loglog = function(lm.r, x){
     lm.r$coefficients[1] + lm.r$coefficients[2]*x
   }
 
-  actual = function(x){
+  actual = function(lm.r, x){
     exp(lm.r$coefficients[1])*x^lm.r$coefficients[2]
   }
 

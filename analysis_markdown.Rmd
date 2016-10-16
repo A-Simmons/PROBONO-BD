@@ -1,6 +1,6 @@
 ---
-title: "A little bit of analysis"
-output: html_document
+title: "A lot of analysis"
+output: word_document
 ---
 
 ```{r setup, include=FALSE}
@@ -21,6 +21,34 @@ data <- read.csv('Greatest_Aussie_Groceries_sales_data.csv', header=TRUE, sep=",
 colnames(data)[colnames(data)=="cx"] <- "cX"
 ```
 
+### Reformatting Data
+```{r}
+# Organic X
+dataR <- data %>% filter(class=="organic") %>% select(STORE, WEEK, Hval_150, pX, cX, oz_X, deal_X, feat_X)
+dataR$brand <- "X"
+dataR$class <- "organic"
+colnames(dataR) <- c("STORE", "WEEK", "Hval", "p", "c", "oz", "deal", "feat", "brand", "class")
+data.ref <- dataR
+# Organic Y
+dataR <- data %>% filter(class=="organic") %>% select(STORE, WEEK, Hval_150, pY, cY, oz_Y, deal_Y, feat_Y)
+dataR$brand <- "Y"
+dataR$class <- "organic"
+colnames(dataR) <- c("STORE", "WEEK", "Hval", "p", "c", "oz", "deal", "feat", "brand", "class")
+data.ref <- rbind(data.ref, dataR)
+# NonOrganic X
+dataR <- data %>% filter(class=="nonorganic") %>% select(STORE, WEEK, Hval_150, pX, cX, oz_X, deal_X, feat_X)
+dataR$brand <- "X"
+dataR$class <- "nonorganic"
+colnames(dataR) <- c("STORE", "WEEK", "Hval", "p", "c", "oz", "deal", "feat", "brand", "class")
+data.ref <- rbind(data.ref, dataR)
+# NonOrganic Y
+dataR <- data %>% filter(class=="nonorganic") %>% select(STORE, WEEK, Hval_150, pY, cY, oz_Y, deal_Y, feat_Y)
+dataR$brand <- "Y"
+dataR$class <- "nonorganic"
+colnames(dataR) <- c("STORE", "WEEK", "Hval", "p", "c", "oz", "deal", "feat", "brand", "class")
+data.ref <- rbind(data.ref, dataR)
+```
+
 ## Mutate Data
 
 We mutate the data to include columns for deal_feat (an indictator for both deal and features), revenue, and profit.
@@ -39,15 +67,15 @@ data <- mutate(data, profit_X = rev_X - cX * pX, profit_Y = rev_Y - cY * pY)
 Lets start by just plotting the profit over the 52 weeks for each store. 
 
 ```{r plot, warning=FALSE}
-plotStore <- function(STORE) {
+plotStore <- function(store_ID) {
 # The palette with black:
 cbbPalette <- c("red4", "orange1", "blue4", "skyblue1", "green4", "chartreuse1", "darkorchid4", "mediumorchid1")
 # Pull data into temp results dataframe
 results <- data.frame(WEEK=c(1:52))
-results[,c("profit_X_org","profit_Y_org")] <- data %>% filter(.,STORE==STORE, class=="organic") %>% select(.,profit_X, profit_Y)
-results[,c("profit_X_non","profit_Y_non")] <- data %>% filter(.,STORE==STORE, class=="nonorganic") %>% select(.,profit_X, profit_Y)
-results[,c("profit_X_org_col","profit_Y_org_col")] <- data %>% filter(.,STORE==STORE, class=="organic") %>% select(.,deal_X, deal_Y)
-results[,c("profit_X_non_col","profit_Y_non_col")] <- data %>% filter(.,STORE==STORE, class=="nonorganic") %>% select(.,deal_X, deal_Y)
+results[,c("profit_X_org","profit_Y_org")] <- data %>% filter(.,STORE==store_ID, class=="organic") %>% select(.,profit_X, profit_Y)
+results[,c("profit_X_non","profit_Y_non")] <- data %>% filter(.,STORE==store_ID, class=="nonorganic") %>% select(.,profit_X, profit_Y)
+results[,c("profit_X_org_col","profit_Y_org_col")] <- data %>% filter(.,STORE==store_ID, class=="organic") %>% select(.,deal_X, deal_Y)
+results[,c("profit_X_non_col","profit_Y_non_col")] <- data %>% filter(.,STORE==store_ID, class=="nonorganic") %>% select(.,deal_X, deal_Y)
 # Assign legend name to categorical data
 results$profit_X_org_col[results$profit_X_org_col == 0] <- "X organic w/o deal"
 results$profit_X_org_col[results$profit_X_org_col == 1] <- "X organic w/ deal"
@@ -64,7 +92,7 @@ ggplot(results, aes(x=WEEK)) +
   geom_point(aes(y=profit_X_non, colour=profit_X_non_col)) +
   geom_point(aes(y=profit_Y_non, colour=profit_Y_non_col)) + 
   scale_colour_manual(values=cbbPalette) +
-  labs(x = "Week", y = "Profit", title = paste("Profit for Store",STORE)) 
+  labs(x = "Week", y = "Profit", title = paste("Profit for Store",store_ID)) 
 }
 
 # Plot the data
@@ -75,6 +103,18 @@ plotStore(4)
 plotStore(5)
 plotStore(6)
 plotStore(7)
+
+## General Scatter Plot
+cbbPalette <- c("red4", "orange1", "blue4", "skyblue1", "green4", "chartreuse1", "darkorchid4", "mediumorchid1")
+generalScatterResults <- data.ref %>% select(WEEK, p, c, oz, deal, class, brand)
+generalScatterResults$deal[generalScatterResults$deal == 1] = "w deal"
+generalScatterResults$deal[generalScatterResults$deal == 0] = "w/o deal"
+generalScatterResults <- generalScatterResults %>% mutate(profit=oz*(p-c))
+generalScatterResults <- generalScatterResults %>% mutate(type=paste(brand,class,deal,sep=" "))
+ggplot(generalScatterResults, aes(x=WEEK)) + 
+  geom_point(aes(y=profit, colour=type)) +
+  scale_colour_manual(values=cbbPalette) +
+  labs(x = "Week", y = "Profit", title = "Profit for products across all stores") 
 ```
 
 # Box plots of profit for the different products
@@ -158,12 +198,10 @@ plotStatsLogLog <- function(lm, type="loglog", title="") {
   results <- mutate(results, loglogSol=lm$coefficients[1] + lm$coefficients[2]*p + if (is.na(lm$coefficients[3])) 0 else lm$coefficients[3]*lm$model$deal)
   results$sol <- exp(results$loglogSol)
   if (type == "loglog")
-    ggplot(results) + geom_point(aes(x=p, y=oz)) + geom_line(aes(x=p, y=loglogSol)) + labs(x="log(p)", y="log(oz)", title=title)
+    ggplot(results) + geom_point(aes(x=p, y=oz)) + geom_line(aes(x=p, y=loglogSol)) + labs(x="log(price)", y="log(oz)", title=title) + coord_flip()
   else
-    ggplot(results) + geom_point(aes(x=exp(p), y=exp(oz))) + geom_line(aes(x=exp(p), y=sol))  + labs(x="p", y="oz", title=title)
+    ggplot(results) + geom_point(aes(x=exp(p), y=exp(oz))) + geom_line(aes(x=exp(p), y=sol))  + labs(x="price", y="oz", title=title) + coord_flip()
 }
-
-
 
 # Function that generates the inear model
 lm_data <- retrieveDataLM(data, CLASS="organic", xy="x")
@@ -252,6 +290,338 @@ plotStatsLogLog(YI_lm_with_deal, "loglog", "loglog PED for Nonorganic Y with dea
 plotStatsLogLog(YI_lm_with_deal, "normal", "PED for Nonorganic Y with deal")
 ```
 
+## Cross Elasticity of demand 
+```{r}
+# Function that pulls out the data
+retrieveDataCPED <- function(data, Q_class, Q_brand) {
+tempQ <- data %>% filter(., class==Q_class) %>% select(., STORE, matches(paste("oz",Q_brand,sep="_")))
+colnames(tempQ) <- c("STORE", "oz")
+tempP_Org <- data %>% filter(., class=="organic") %>% select(., pX, pY)
+colnames(tempP_Org) <- c("p_X_org", "p_Y_org")
+tempP_NonOrg <- data %>% filter(., class=="nonorganic") %>% select(., pX, pY)
+colnames(tempP_NonOrg) <- c("p_X_nonorg", "p_Y_nonorg")
+return(data.frame(tempQ, tempP_Org, tempP_NonOrg))
+}
+
+# Function that plots the loglog and actual curves
+crossPEDLinearReg <- function(data, TYPES, log=TRUE) {
+  Q <- data %>% select(oz) %>% {if (log) log(.) else (.)} %>% as.matrix()
+  pXOrg <- data %>% select(p_X_org) %>% {if (log) log(.) else (.)} %>% {if ("xOrg" %in% TYPES) (.) else (.)*0} %>% as.matrix()
+  pYOrg <- data %>% select(p_Y_org) %>% {if (log) log(.) else (.)} %>% {if ("yOrg" %in% TYPES) (.) else (.)*0}  %>% as.matrix()
+  pXNonOrg <- data %>% select(p_X_nonorg) %>% {if (log) log(.) else (.)} %>% {if ("xNonOrg" %in% TYPES) (.) else (.)*0}  %>% as.matrix()
+  pYNonOrg <- data %>% select(p_Y_nonorg) %>% {if (log) log(.) else (.)} %>% {if ("yNonOrg" %in% TYPES) (.) else (.)*0}  %>% as.matrix()
+  return(lm(Q~pXOrg+pYOrg+pXNonOrg+pYNonOrg))
+}
+
+
+crossXOrg <- retrieveDataCPED(data, "organic", "X")
+crossYOrg <- retrieveDataCPED(data, "organic", "Y")
+crossXNonOrg <- retrieveDataCPED(data, "nonorganic", "X")
+crossYNonOrg <- retrieveDataCPED(data, "nonorganic", "Y")
+
+lmXOrg <- crossPEDLinearReg(crossXOrg, c("xOrg"))
+summary(lmXOrg)
+
+lmXOrg <- crossPEDLinearReg(crossXOrg, c("yOrg"))
+summary(lmXOrg)
+
+lmXOrg <- crossPEDLinearReg(crossXOrg, c("xNonOrg"))
+summary(lmXOrg)
+
+lmXOrg <- crossPEDLinearReg(crossXOrg, c("yNonOrg"))
+summary(lmXOrg)
+```
+
+### Profit versus Price for the four products
+```{r}
+XOrg.Qcoef = c(-16.8432,-7.0398)
+YOrg.Qcoef = c(-15.7803,-6.7308)
+XNonOrg.Qcoef = c(-15.8704,-6.7511)
+YNonOrg.Qcoef = c(-15.4133,-6.657)
+
+XOrg.Ccoef = c(-0.0006,0.8491)
+YOrg.Ccoef = c(0.0003,0.8042)
+XNonOrg.Ccoef = c(-0.0004,0.8434)
+YNonOrg.Ccoef = c(0.0003,0.804)
+
+profit <- function(price, Qcoef, Ccoef) {
+  quantity <- exp(Qcoef[1]) * price^Qcoef[2]
+  cost <- Ccoef[1] + Ccoef[2]*price
+  return(quantity*(price-cost))
+}
+Xorg.Profit.func <- function(price) {
+  return(profit(price,XOrg.Qcoef,XOrg.Ccoef))
+}
+Yorg.Profit.func <- function(price) {
+  return(profit(price,YOrg.Qcoef,YOrg.Ccoef))
+}
+Xnonorg.Profit.func <- function(price) {
+  return(profit(price,XNonOrg.Qcoef,XNonOrg.Ccoef))
+}
+Ynonorg.Profit.func <- function(price) {
+  return(profit(price,YNonOrg.Qcoef,YNonOrg.Ccoef))
+}
+ggplot(data.frame(price = c(0.018, 0.035)), aes(price)) + 
+  stat_function(fun = Xorg.Profit.func, aes(colour = "organic X")) + 
+  stat_function(fun = Yorg.Profit.func, aes(colour = "organic Y")) + 
+  stat_function(fun = Xnonorg.Profit.func, aes(colour = "inorganic X")) + 
+  stat_function(fun = Ynonorg.Profit.func, aes(colour = "inorganic Y")) +
+  scale_colour_manual("Lgend title", values = c("red", "blue", "green", "orange")) +
+  labs(x = "price/oz", y = "profit/wk", title = "Profit per week versus price for each product")
+```
+
+
+
+### Marginal Cost = Marginal Revenue
+```{r}
+# Linear Model for C(q)
+costQuantityLM <- function(data, CLASS, BRAND) {
+  cost <- data %>% filter(class==CLASS, brand==BRAND) %>% select(c) %>% log() %>% as.matrix()
+  quantity <- data %>% filter(class==CLASS, brand==BRAND) %>% select(oz) %>% log() %>% as.matrix()
+  return(lm(cost~quantity))
+}
+
+# Linear Model for R(q)
+revenueQuantityLM <- function(data, CLASS, BRAND) {
+  revenue <- data %>% filter(class==CLASS, brand==BRAND) %>% select(p) %>% log() %>% as.matrix()
+  quantity <- data %>% filter(class==CLASS, brand==BRAND) %>% select(oz) %>% log() %>% as.matrix()
+  return(lm(revenue~quantity))
+}
+
+marginalValue <- function(point, coef) {
+  return(exp(coef[1])*point^coef[2] + coef[2]*exp(coef[1])*point^(coef[2]-1)*point)
+}
+
+cQ_X_org <- costQuantityLM(data.ref, "organic", "X")
+cQ_X_org$coefficients[1] <- cQ_X_org$coefficients[1]
+cQ_X_org$coefficients[2] <- cQ_X_org$coefficients[2]/1.15
+cQ_Y_org <- costQuantityLM(data.ref, "organic", "Y")
+cQ_X_nonorg <- costQuantityLM(data.ref, "nonorganic", "X")
+cQ_Y_nonorg <- costQuantityLM(data.ref, "nonorganic", "Y")
+
+rQ_X_org <- revenueQuantityLM(data.ref, "organic", "X")
+rQ_Y_org <- revenueQuantityLM(data.ref, "organic", "Y")
+rQ_X_nonorg <- revenueQuantityLM(data.ref, "nonorganic", "X")
+rQ_Y_nonorg <- revenueQuantityLM(data.ref, "nonorganic", "Y")
+
+cQ_XO_Curve <- function(quantity) return(marginalValue(quantity,cQ_X_org$coefficients))
+rQ_XO_Curve <- function(quantity) return(marginalValue(quantity,rQ_X_org$coefficients))
+
+cQ_YO_Curve <- function(quantity) return(marginalValue(quantity,cQ_Y_org$coefficients))
+rQ_YO_Curve <- function(quantity) return(marginalValue(quantity,rQ_Y_org$coefficients))
+
+cQ_XI_Curve <- function(quantity) return(marginalValue(quantity,cQ_X_nonorg$coefficients))
+rQ_XI_Curve <- function(quantity) return(marginalValue(quantity,rQ_X_nonorg$coefficients))
+
+cQ_YI_Curve <- function(quantity) return(marginalValue(quantity,cQ_Y_nonorg$coefficients))
+rQ_YI_Curve <- function(quantity) return(marginalValue(quantity,rQ_Y_nonorg$coefficients))
+
+quantity.range = c(10, 100000)
+ggplot(data.frame(quantity = quantity.range ), aes(quantity)) + 
+  stat_function(fun = cQ_XO_Curve, aes(colour = "MC XO")) + 
+  stat_function(fun = rQ_XO_Curve, aes(colour = "MR XO")) + 
+  labs(y = "price/cost (per oz)", x="Quantity", title = "MC and MR for Organic X")
+
+ggplot(data.frame(quantity = quantity.range ), aes(quantity)) + 
+  stat_function(fun = cQ_YO_Curve, aes(colour = "MC YO")) + 
+  stat_function(fun = rQ_YO_Curve, aes(colour = "MR YO")) + 
+  labs(y = "price/cost (per oz)", x="Quantity", title = "MC and MR for Organic Y")
+
+ggplot(data.frame(quantity = quantity.range ), aes(quantity)) + 
+  stat_function(fun = cQ_XI_Curve, aes(colour = "MC XI")) + 
+  stat_function(fun = rQ_XI_Curve, aes(colour = "MR XI")) + 
+  labs(y = "price/cost (per oz)", x="Quantity", title = "MC and MR for NonOrganic X")
+
+ggplot(data.frame(quantity = quantity.range ), aes(quantity)) + 
+  stat_function(fun = cQ_YI_Curve, aes(colour = "MC YI")) + 
+  stat_function(fun = rQ_YI_Curve, aes(colour = "MR YI")) + 
+  labs(y = "price/cost (per oz)", x="Quantity", title = "MC and MR for NonOrganic Y")
+```
+
+### MC = MR fake data
+Reduced cost/oz response to an increase in quantity by 15% to reflect a greater fixed cost. 
+```{r}
+cQ_X_org <- costQuantityLM(data.ref, "organic", "X")
+cQ_X_org$coefficients[1] <- cQ_X_org$coefficients[1]
+cQ_X_org$coefficients[2] <- cQ_X_org$coefficients[2]/1.15
+cQ_XO_Curve <- function(quantity) return(marginalValue(quantity,cQ_X_org$coefficients))
+rQ_XO_Curve <- function(quantity) return(marginalValue(quantity,rQ_X_org$coefficients))
+quantity.range = c(10, 100000)
+ggplot(data.frame(quantity = quantity.range ), aes(quantity)) + 
+  stat_function(fun = cQ_XO_Curve, aes(colour = "MC XO")) + 
+  stat_function(fun = rQ_XO_Curve, aes(colour = "MR XO")) + 
+  labs(y = "price/cost (per oz)", x="Quantity", title = "MC and MR for Organic X (with improved c curve)")
+
+ggplot(data.frame(quantity = quantity.range ), aes(quantity)) + 
+  stat_function(fun = cQ_XO_Curve, aes(colour = "MC XO")) + 
+  stat_function(fun = rQ_XO_Curve, aes(colour = "MR XO")) + 
+  labs(y = "log10 price/cost (per oz)", x="log 10 Quantity", title = "MC and MR for Organic X (with improved c curve)") +
+  scale_x_log10()
+```
+
+### Multivariate cross-PED
+```{r}
+crossPEDLM <- function(data.ref, BRAND="X", CLASS="organic") {
+  quantity <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(oz) %>% log() %>% as.matrix()
+  hVal <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(Hval) %>% log() %>% as.matrix()
+  XO_org_price <- data.ref %>% filter(brand=="X", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  YO_org_price <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  XI_org_price <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  YI_org_price <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  XO_org_deal <- data.ref %>% filter(brand=="X", class=="organic") %>% select(deal) %>% as.matrix()
+  YO_org_deal <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(deal) %>% as.matrix()
+  XI_org_deal <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  YI_org_deal <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  
+  lm.crossPED <- lm(quantity~hVal + XO_org_price + YO_org_price + XI_org_price + YI_org_price + XO_org_deal + YO_org_deal + XI_org_deal + YI_org_deal)
+}
+```
+
+### Multivariate cross-PED for XO
+```{r}
+crossPEDLMXO <- function(data.ref, BRAND="X", CLASS="organic") {
+  quantity <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(oz) %>% log() %>% as.matrix()
+  hVal <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(Hval) %>% log() %>% as.matrix()
+  XO_org_price <- data.ref %>% filter(brand=="X", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  YO_org_price <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  XI_org_price <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  YI_org_price <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  XO_org_deal <- data.ref %>% filter(brand=="X", class=="organic") %>% select(deal) %>% as.matrix()
+  YO_org_deal <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(deal) %>% as.matrix()
+  XI_org_deal <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  YI_org_deal <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  
+  lm.crossPED <- lm(quantity~XO_org_price + XO_org_deal + YO_org_deal)
+}
+XO_cross_PED <- crossPEDLM(data.ref, "X", "organic")
+summary(XO_cross_PED)
+XO_cross_PED <- crossPEDLMXO(data.ref, "X", "organic")
+summary(XO_cross_PED)
+```
+### Multivariate cross-PED for YO
+```{r}
+crossPEDLMYO <- function(data.ref, BRAND="Y", CLASS="organic") {
+  quantity <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(oz) %>% log() %>% as.matrix()
+  hVal <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(Hval) %>% log() %>% as.matrix()
+  XO_org_price <- data.ref %>% filter(brand=="X", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  YO_org_price <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  XI_org_price <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  YI_org_price <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  XO_org_deal <- data.ref %>% filter(brand=="X", class=="organic") %>% select(deal) %>% as.matrix()
+  YO_org_deal <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(deal) %>% as.matrix()
+  XI_org_deal <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  YI_org_deal <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  
+  lm.crossPED <- lm(quantity~XO_org_price + YO_org_price + YO_org_deal)
+}
+YO_cross_PED <- crossPEDLM(data.ref, "Y", "organic")
+summary(YO_cross_PED)
+YO_cross_PED <- crossPEDLMYO(data.ref, "Y", "organic")
+summary(YO_cross_PED)
+```
+### Multivariate cross-PED for XI
+```{r}
+crossPEDLMXI <- function(data.ref, BRAND="X", CLASS="nonorganic") {
+  quantity <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(oz) %>% log() %>% as.matrix()
+  hVal <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(Hval) %>% log() %>% as.matrix()
+  XO_org_price <- data.ref %>% filter(brand=="X", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  YO_org_price <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  XI_org_price <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  YI_org_price <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  XO_org_deal <- data.ref %>% filter(brand=="X", class=="organic") %>% select(deal) %>% as.matrix()
+  YO_org_deal <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(deal) %>% as.matrix()
+  XI_org_deal <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  YI_org_deal <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  
+  lm.crossPED <- lm(quantity~XI_org_price + YI_org_price + XI_org_deal)
+}
+XI_cross_PED <- crossPEDLM(data.ref, "X", "nonorganic")
+summary(XI_cross_PED)
+XI_cross_PED <- crossPEDLMXI(data.ref, "X", "nonorganic")
+summary(XI_cross_PED)
+```
+
+### Multivariate cross-PED for YI
+```{r}
+crossPEDLMYI <- function(data.ref, BRAND="Y", CLASS="nonorganic") {
+  quantity <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(oz) %>% log() %>% as.matrix()
+  hVal <- data.ref %>% filter(brand==BRAND, class==CLASS) %>% select(Hval) %>% log() %>% as.matrix()
+  XO_org_price <- data.ref %>% filter(brand=="X", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  YO_org_price <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(p) %>% log() %>% as.matrix()
+  XI_org_price <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  YI_org_price <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(p) %>% log() %>% as.matrix()
+  XO_org_deal <- data.ref %>% filter(brand=="X", class=="organic") %>% select(deal) %>% as.matrix()
+  YO_org_deal <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(deal) %>% as.matrix()
+  XI_org_deal <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  YI_org_deal <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(deal) %>% as.matrix()
+  
+  lm.crossPED <- lm(quantity~XI_org_price + YI_org_price + YI_org_deal)
+}
+YI_cross_PED <- crossPEDLM(data.ref, "Y", "nonorganic")
+summary(YI_cross_PED)
+YI_cross_PED <- crossPEDLMYI(data.ref, "Y", "nonorganic")
+summary(YI_cross_PED)
+```
+
+```{r}
+summary_XO <- data.ref %>% filter(brand=="X", class=="organic") %>% select(oz, p, c, deal, feat)
+summary_XO <- mutate(summary_XO, profit=oz*(p-c))
+summary_XO$deal[summary_XO$deal == 0] <- "Without"
+summary_XO$deal[summary_XO$deal == 1] <- "With"
+summary_XO$feat[summary_XO$feat == 0] <- "Without"
+summary_XO$feat[summary_XO$feat == 1] <- "With"
+ggplot(summary_XO, aes(x=deal, y=profit)) + geom_boxplot() + labs(title="XO profit with and without a deal", x="Deal", y = "Profit") 
+
+ggplot(summary_XO, aes(x=deal, y=oz)) + geom_boxplot() + labs(title="XO oz sold with and without a deal", x="Deal", y = "Oz") 
+
+ggplot(summary_XO, aes(x=feat, y=profit)) + geom_boxplot() + labs(title="XO profit with and without a feature", x="Feature", y = "Profit") 
+
+ggplot(summary_XO, aes(x=feat, y=oz)) + geom_boxplot() + labs(title="XO oz sold with and without a feature", x="Feature", y = "Oz") 
+
+summary_YO <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(oz, p, c, deal, feat)
+summary_YO <- mutate(summary_YO, profit=oz*(p-c))
+summary_YO$deal[summary_YO$deal == 0] <- "Without"
+summary_YO$deal[summary_YO$deal == 1] <- "With"
+summary_YO$feat[summary_XO$feat == 0] <- "Without"
+summary_YO$feat[summary_XO$feat == 1] <- "With"
+ggplot(summary_YO, aes(x=deal, y=profit)) + geom_boxplot() + labs(title="YO profit with and without a deal", x="Deal", y = "Profit") 
+
+ggplot(summary_YO, aes(x=deal, y=oz)) + geom_boxplot() + labs(title="YO oz sold with and without a deal", x="Deal", y = "Oz") 
+
+ggplot(summary_YO, aes(x=feat, y=profit)) + geom_boxplot() + labs(title="YO profit with and without a feature", x="Feature", y = "Profit") 
+
+ggplot(summary_YO, aes(x=feat, y=oz)) + geom_boxplot() + labs(title="YO oz sold with and without a feature", x="Feature", y = "Oz") 
+
+summary_XI <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(oz, p, c, deal, feat)
+summary_XI <- mutate(summary_XI, profit=oz*(p-c))
+summary_XI$deal[summary_XI$deal == 0] <- "Without"
+summary_XI$deal[summary_XI$deal == 1] <- "With"
+summary_XI$feat[summary_XI$feat == 0] <- "Without"
+summary_XI$feat[summary_XI$feat == 1] <- "With"
+ggplot(summary_XI, aes(x=deal, y=profit)) + geom_boxplot() + labs(title="XI profit with and without a deal", x="Deal", y = "Profit") 
+
+ggplot(summary_XI, aes(x=deal, y=oz)) + geom_boxplot() + labs(title="XI oz sold with and without a deal", x="Deal", y = "Oz") 
+
+ggplot(summary_XI, aes(x=feat, y=profit)) + geom_boxplot() + labs(title="XI profit with and without a feature", x="Feature", y = "Profit") 
+
+ggplot(summary_XI, aes(x=feat, y=oz)) + geom_boxplot() + labs(title="XI oz sold with and without a feature", x="Feature", y = "Oz") 
+
+
+summary_YI <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(oz, p, c, deal, feat)
+summary_YI <- mutate(summary_YI, profit=oz*(p-c))
+summary_YI$deal[summary_YI$deal == 0] <- "Without"
+summary_YI$deal[summary_YI$deal == 1] <- "With"
+summary_YI$feat[summary_YI$feat == 0] <- "Without"
+summary_YI$feat[summary_YI$feat == 1] <- "With"
+ggplot(summary_YI, aes(x=deal, y=profit)) + geom_boxplot() + labs(title="YI profit with and without a deal", x="Deal", y = "Profit") 
+
+ggplot(summary_YI, aes(x=deal, y=oz)) + geom_boxplot() + labs(title="YI oz sold with and without a deal", x="Deal", y = "Oz") 
+
+
+ggplot(summary_YI, aes(x=feat, y=profit)) + geom_boxplot() + labs(title="YI profit with and without a deal", x="Feature", y = "Profit") 
+
+ggplot(summary_YI, aes(x=feat, y=oz)) + geom_boxplot() + labs(title="YI oz sold with and without a feature", x="Feature", y = "Oz") 
+```
 
 
 

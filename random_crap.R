@@ -19,16 +19,10 @@ filteredLM <- function(data, TYPE, log=FALSE, include_Deal=FALSE) {
   return(lm(response~ind+deal))
 }
 
-plotStats <- function(lm, title) {
-  results <- data.frame(p=lm$model$ind, resid=resid(lm))
-  head(results)
-  results <- mutate(results, loglogSol=lm$coefficients[1] + lm$coefficients[2]*p, sol=exp(lm$coefficients[1])*p^lm$coefficients[2])
-
-   ggplot(results) + geom_point(aes(x=p, y=resid)) + labs(x="p", y="residuals", title=title)
-##  ggplot(results) + geom_point(aes(x=p, y=loglogSol)) + labs(x="p", y="residuals", title=title)
-  #ggplot(results) + geom_point(aes(x=p, y=sol)) + labs(x="p", y="residuals", title=title)
-  
-  return(0)
+plotStats <- function(lm) {
+  results <- data.frame(p=lm$model$ind, oz=lm$model$response, resid=resid(lm))
+  results <- mutate(results, loglogSol=lm$coefficients[1] + lm$coefficients[2]*p + if (is.na(lm$coefficients[3])) 0 else lm$coefficients[3]*lm$model$deal, sol=exp(lm$coefficients[1])*p^lm$coefficients[2])
+  ggplot(results) + geom_point(aes(x=p, y=oz)) + geom_line(aes(x=p, y=loglogSol)) 
 }
 # Function that plots the loglog and actual curves
 
@@ -55,3 +49,6 @@ XI_lm_with_deal <- filteredLM(lm_data, TYPE="XI", log=TRUE, include_Deal=TRUE)
 XI_lm_without_deal <- filteredLM(lm_data, TYPE="XI", log=TRUE, include_Deal=FALSE)
 YI_lm_with_deal <- filteredLM(lm_data, TYPE="YI", log=TRUE, include_Deal=TRUE)
 YI_lm_without_deal <- filteredLM(lm_data, TYPE="YI", log=TRUE, include_Deal=FALSE)
+
+
+

@@ -1,6 +1,6 @@
 ---
 title: "A lot of analysis"
-output: word_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -563,6 +563,43 @@ YI_cross_PED <- crossPEDLMYI(data.ref, "Y", "nonorganic")
 summary(YI_cross_PED)
 ```
 
+# General Statistics
+```{r}
+data.ref <- data.ref %>% mutate(profit=oz*(p-c))
+# organic X
+XO_oz_total <- data.ref %>% filter(brand=="X", class=="organic") %>% select(oz) %>% sum() 
+XO_profit_total <- data.ref %>% filter(brand=="X", class=="organic") %>% select(profit) %>% sum() 
+XO_oz_mean <- XO_oz_total/(52*7)
+XO_profit_mean <- XO_profit_total/(52*7) 
+
+# organic Y
+YO_oz_total <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(oz) %>% sum() 
+YO_profit_total <- data.ref %>% filter(brand=="Y", class=="organic") %>% select(profit) %>% sum() 
+YO_oz_mean <- YO_oz_total/(52*7)
+YO_profit_mean <- YO_profit_total/(52*7)
+
+# nonorganic X
+XI_oz_total <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(oz) %>% sum() 
+XI_profit_total <- data.ref %>% filter(brand=="X", class=="nonorganic") %>% select(profit) %>% sum() 
+XI_oz_mean <- XI_oz_total/(52*7)
+XI_profit_mean <- XI_profit_total/(52*7)  
+
+# nonorganic Y
+YI_oz_total <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(oz) %>% sum() 
+YI_profit_total <- data.ref %>% filter(brand=="Y", class=="nonorganic") %>% select(profit) %>% sum() 
+YI_oz_mean <- YI_oz_total/(52*7)
+YI_profit_mean <- YI_profit_total/(52*7) 
+```
+
+value | organic X | organic Y | nonorganic X | nonorganic Y
+------|-----------|-----------|--------------|-------------
+Total oz | `r XO_oz_total` | `r YO_oz_total` | `r XI_oz_total` | `r YI_oz_total`
+Total profit | `r XO_profit_total` | `r YO_profit_total` | `r XI_profit_total` | `r YI_profit_total`
+Average oz | `r XO_oz_mean` | `r YO_oz_mean` | `r XI_oz_mean` | `r YI_oz_mean`
+Average profit | `r XO_profit_mean` | `r YO_profit_mean` | `r XI_profit_mean` | `r YI_profit_mean``
+
+
+## Boxplots of Product Price and Oz
 ```{r}
 summary_XO <- data.ref %>% filter(brand=="X", class=="organic") %>% select(oz, p, c, deal, feat)
 summary_XO <- mutate(summary_XO, profit=oz*(p-c))
